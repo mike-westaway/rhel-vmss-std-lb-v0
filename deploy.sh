@@ -1,5 +1,6 @@
 #!/bin/bash
-set -euo pipefail
+#set -euo pipefail
+set -eu
 IFS=$'\n\t'
 
 # -e: immediately exit if any command has a non-zero exit status

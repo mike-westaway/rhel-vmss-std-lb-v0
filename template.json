@@ -1,243 +1,182 @@
 {
     "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json",
     "contentVersion": "1.0.0.0",
-    "parameters": {
-        "vmSku": {
-            "defaultValue": "Standard_A1",
-            "type": "String",
-            "metadata": {
-                "description": "Size of VMs in the VM Scale Set."
-            }
-        },
-        "ubuntuOSVersion": {
-            "defaultValue": "16.04-LTS",
-            "allowedValues": [
-                "16.04-LTS",
-                "14.04.4-LTS"
-            ],
-            "type": "String",
-            "metadata": {
-                "description": "The Ubuntu version for the VM. This will pick a fully patched image of this given Ubuntu version. Allowed values are: 16.04-LTS, 14.04.4-LTS."
-            }
-        },
-        "vmssName": {
-            "maxLength": 61,
-            "type": "String",
-            "metadata": {
-                "description": "String used as a base for naming resources (9 characters or less). A hash is prepended to this string for some resources, and resource-specific information is appended."
-            }
-        },
-        "instanceCount": {
-            "maxValue": 100,
-            "type": "Int",
-            "metadata": {
-                "description": "Number of VM instances (100 or less)."
-            }
-        },
-        "adminUsername": {
-            "type": "String",
-            "metadata": {
-                "description": "Admin username on all VMs."
-            }
-        },
-        "adminPassword": {
-            "type": "SecureString",
-            "metadata": {
-                "description": "Admin password on all VMs."
-            }
-        }
+  "parameters": {
+    "vmSku": {
+      "defaultValue": "Standard_A1",
+      "type": "string",
+      "metadata": {
+        "description": "Size of VMs in the VM Scale Set."
+      }
     },
-    "variables": {
-        "namingInfix": "[toLower(substring(concat(parameters('vmssName'), uniqueString(resourceGroup().id)), 0, 9))]",
-        "newStorageAccountSuffix": "[concat(variables('namingInfix'), 'sa')]",
-        "longNamingInfix": "[toLower(parameters('vmssName'))]",
-        "jumpBoxName": "[concat(variables('namingInfix'), 'jbox')]",
-        "jumpBoxSAName": "[concat(uniqueString(concat(resourceGroup().id, variables('newStorageAccountSuffix'), 'jumpboxsa')), 'jb')]",
-        "jumpBoxOSDiskName": "[concat(variables('jumpBoxName'), 'osdisk')]",
-        "jumpBoxVHDContainerName": "[concat(variables('jumpBoxName'), 'vhd')]",
-        "jumpBoxIPConfigName": "[concat(variables('jumpBoxName'), 'ipconfig')]",
-        "jumpBoxNicName": "[concat(variables('jumpBoxName'), 'nic')]",
-        "storageAccountType": "Standard_LRS",
-        "addressPrefix": "10.0.0.0/16",
-        "subnetPrefix": "10.0.0.0/24",
-        "virtualNetworkName": "[concat(variables('namingInfix'), 'vnet')]",
-        "subnetName": "[concat(variables('namingInfix'), 'subnet')]",
-        "subnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('virtualNetworkName'), variables('subnetName'))]",
-        "publicIPAddressName": "[concat(variables('namingInfix'), 'pip')]",
-        "loadBalancerName": "[concat(variables('namingInfix'), 'lb')]",
-        "lbID": "[resourceId('Microsoft.Network/loadBalancers',variables('loadBalancerName'))]",
-        "natPoolName": "[concat(variables('namingInfix'), 'natpool')]",
-        "bePoolName": "[concat(variables('namingInfix'), 'bepool')]",
-        "natStartPort": 50000,
-        "natEndPort": 50119,
-        "natBackendPort": 22,
-        "nicName": "[concat(variables('namingInfix'), 'nic')]",
-        "ipConfigName": "[concat(variables('namingInfix'), 'ipconfig')]",
-        "frontEndIPConfigID": "[concat(variables('lbID'),'/frontendIPConfigurations/loadBalancerFrontEnd')]",
-        "osType": {
-            "publisher": "Canonical",
-            "offer": "UbuntuServer",
-            "sku": "[parameters('ubuntuOSVersion')]",
-            "version": "latest"
-        },
-        "imageReference": "[variables('osType')]",
-        "computeApiVersion": "2017-03-30",
-        "networkApiVersion": "2017-04-01",
-        "storageApiVersion": "2015-06-15"
+    "RhelOSVersion": {
+      "defaultValue": "7.2",
+      "allowedValues": [
+        "7.2"
+      ],
+      "type": "string",
+      "metadata": {
+        "description": "The Ubuntu version for the VM. This will pick a fully patched image of this given Ubuntu version. Allowed values are: 16.04-LTS, 14.04.4-LTS."
+      }
     },
-    "resources": [
-        {
-            "type": "Microsoft.Network/virtualNetworks",
-            "name": "[variables('virtualNetworkName')]",
-            "apiVersion": "2017-04-01",
-            "location": "[resourceGroup().location]",
+    "vmssName": {
+      "maxLength": 61,
+      "type": "string",
+      "metadata": {
+        "description": "String used as a base for naming resources (9 characters or less). A hash is prepended to this string for some resources, and resource-specific information is appended."
+      }
+    },
+    "existingVirtualNetworkResourceGroupName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Resource Group containing the existing VNET"
+      }
+    },
+    "existingVirtualNetworkName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the existing VNET"
+      }
+    },
+    "existingSubnetName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the existing Subnet"
+      }
+    },
+    "loadBalancerPrivateIpAddress": {
+      "type": "string",
+      "metadata": {
+        "description": "IP address for the load balancer within the subnet"
+      }
+    },
+    "instanceCount": {
+      "maxValue": 100,
+      "type": "int",
+      "metadata": {
+        "description": "Number of VM instances (100 or less)."
+      }
+    },
+    "adminUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "Admin username on all VMs."
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Admin password on all VMs."
+      }
+    }
+  },
+  "variables": {
+    "namingInfix": "[toLower(substring(concat(parameters('vmssName'), uniqueString(resourceGroup().id)), 0, 9))]",
+    "newStorageAccountSuffix": "[concat(variables('namingInfix'), 'sa')]",
+    "longNamingInfix": "[toLower(parameters('vmssName'))]",
+    "addressPrefix": "10.0.0.0/16",
+    "subnetPrefix": "10.0.0.0/24",
+    "subnetName": "[parameters('existingSubnetName')]",
+    "subnetRef": "[resourceId(subscription().subscriptionId, parameters('existingVirtualNetworkResourceGroupName'), 'Microsoft.Network/virtualNetworks/subnets', parameters('existingVirtualNetworkName'), variables('subnetName'))]",
+    "virtualNetworkName": "[parameters('existingVirtualNetworkName')]",
+    "publicIPAddressName": "[concat(variables('namingInfix'), 'pip')]",
+    "privateIpAddress":  "[parameters('loadBalancerPrivateIpAddress')]",
+    "loadBalancerName": "[concat(variables('namingInfix'), 'lb')]",
+    "lbID": "[resourceId('Microsoft.Network/loadBalancers',variables('loadBalancerName'))]",
+    "natPoolName": "[concat(variables('namingInfix'), 'natpool')]",
+    "bePoolName": "[concat(variables('namingInfix'), 'bepool')]",
+    "natStartPort": 50000,
+    "natEndPort": 50119,
+    "natFrontendPort": 50000,
+    "natBackendPort": 22,
+    "nicName": "[concat(variables('namingInfix'), 'nic')]",
+    "ipConfigName": "[concat(variables('namingInfix'), 'ipconfig')]",
+    "frontEndIPConfigID": "[concat(variables('lbID'),'/frontendIPConfigurations/loadBalancerFrontEnd')]",
+    "lbBackendAddressPoolID": "[concat(variables('lbID'), '/backendAddressPools/', variables('bePoolName'))]",
+    "osType": {
+      "publisher": "RedHat",
+      "offer": "RHEL",
+      "sku": "[parameters('RhelOSVersion')]",
+      "version": "latest"
+    },
+    "imageReference": "[variables('osType')]",
+    "computeApiVersion": "2017-03-30",
+    "networkApiVersion": "2017-04-01",
+    "storageApiVersion": "2015-06-15"
+  },
+  "resources": [
+    {
+      "comments": "Generalized from resource:",
+      "type": "Microsoft.Network/loadBalancers",
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
+      },
+      "name": "[variables('loadBalancerName')]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "scale": null,
+      "properties": {
+        "provisioningState": "Succeeded",
+        "resourceGuid": "172126ef-5579-4f3a-82e9-7c594e7f59df",
+        "frontendIPConfigurations": [
+          {
+            "name": "LoadBalancerFrontEnd",
+            "etag": "W/\"3b3e53e4-99c0-4587-ab46-5f3f3a1af811\"",
             "properties": {
-                "addressSpace": {
-                    "addressPrefixes": [
-                        "[variables('addressPrefix')]"
-                    ]
-                },
-                "subnets": [
-                    {
-                        "name": "[variables('subnetName')]",
-                        "properties": {
-                            "addressPrefix": "[variables('subnetPrefix')]"
-                        }
-                    }
-                ]
+              "provisioningState": "Succeeded",
+              "privateIPAddress": "[variables('privateIpAddress')]",
+              "privateIPAllocationMethod": "Static",
+              "subnet": {
+                "id": "[variables('subnetRef')]"
+              }
             }
-        },
-        {
-            "type": "Microsoft.Storage/storageAccounts",
-            "name": "[variables('jumpBoxSAName')]",
-            "apiVersion": "2015-06-15",
-            "location": "[resourceGroup().location]",
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "[variables('bePoolName')]"
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "LB-Rule1",
             "properties": {
-                "accountType": "[variables('storageAccountType')]"
+              "frontendIPConfiguration": {
+                "id": "[variables('frontEndIPConfigID')]"
+              },
+              "backendAddressPool": {
+                "id": "[variables('lbBackendAddressPoolID')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": "[variables('natFrontendPort')]",
+              "backendPort": "[variables('natBackendPort')]",
+              "enableFloatingIP": false,
+              "idleTimeoutInMinutes": 5,
+              "probe": {
+                "id": "[concat(variables('lbID'),'/probes/lbProbe1')]"
+              }
             }
-        },
-        {
-            "type": "Microsoft.Network/networkInterfaces",
-            "name": "[variables('jumpBoxNicName')]",
-            "apiVersion": "2017-04-01",
-            "location": "[resourceGroup().location]",
+          }
+        ],
+        "probes": [
+          {
+            "name": "lbProbe1",
             "properties": {
-                "ipConfigurations": [
-                    {
-                        "name": "[variables('jumpBoxIPConfigName')]",
-                        "properties": {
-                            "privateIPAllocationMethod": "Dynamic",
-                            "publicIPAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('publicIPAddressName'))]"
-                            },
-                            "subnet": {
-                                "id": "[variables('subnetRef')]"
-                            }
-                        }
-                    }
-                ]
-            },
-            "dependsOn": [
-                "[concat('Microsoft.Network/publicIPAddresses/', variables('publicIPAddressName'))]",
-                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
-            ]
-        },
-        {
-            "type": "Microsoft.Network/publicIPAddresses",
-            "name": "[variables('publicIPAddressName')]",
-            "apiVersion": "2017-04-01",
-            "location": "[resourceGroup().location]",
-            "properties": {
-                "publicIPAllocationMethod": "Dynamic",
-                "dnsSettings": {
-                    "domainNameLabel": "[variables('longNamingInfix')]"
-                }
+              "protocol": "Tcp",
+              "port": "[variables('natBackendPort')]",
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2
             }
-        },
-        {
-            "type": "Microsoft.Compute/virtualMachines",
-            "name": "[variables('jumpBoxName')]",
-            "apiVersion": "2017-03-30",
-            "location": "[resourceGroup().location]",
-            "properties": {
-                "hardwareProfile": {
-                    "vmSize": "[parameters('vmSku')]"
-                },
-                "osProfile": {
-                    "computerName": "[variables('jumpBoxName')]",
-                    "adminUsername": "[parameters('adminUsername')]",
-                    "adminPassword": "[parameters('adminPassword')]"
-                },
-                "storageProfile": {
-                    "imageReference": "[variables('imageReference')]",
-                    "osDisk": {
-                        "name": "[variables('jumpBoxOSDiskName')]",
-                        "vhd": {
-                            "uri": "[concat('http://',variables('jumpBoxSAName'),'.blob.core.windows.net/',variables('jumpBoxVHDContainerName'),'/',variables('jumpBoxOSDiskName'),'.vhd')]"
-                        },
-                        "caching": "ReadWrite",
-                        "createOption": "FromImage"
-                    }
-                },
-                "networkProfile": {
-                    "networkInterfaces": [
-                        {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('jumpBoxNicName'))]"
-                        }
-                    ]
-                },
-                "diagnosticsProfile": {
-                    "bootDiagnostics": {
-                        "enabled": "true",
-                        "storageUri": "[concat('http://',variables('jumpBoxSAName'),'.blob.core.windows.net')]"
-                    }
-                }
-            },
-            "dependsOn": [
-                "[concat('Microsoft.Storage/storageAccounts/', variables('jumpBoxSAName'))]",
-                "[concat('Microsoft.Network/networkInterfaces/', variables('jumpBoxNicName'))]"
-            ]
-        },
-        {
-            "type": "Microsoft.Network/loadBalancers",
-            "name": "[variables('loadBalancerName')]",
-            "apiVersion": "2017-04-01",
-            "location": "[resourceGroup().location]",
-            "properties": {
-                "frontendIPConfigurations": [
-                    {
-                        "name": "LoadBalancerFrontEnd",
-                        "properties": {
-                            "subnet": {
-                                "id": "[variables('subnetRef')]"
-                            }
-                        }
-                    }
-                ],
-                "backendAddressPools": [
-                    {
-                        "name": "[variables('bePoolName')]"
-                    }
-                ],
-                "inboundNatPools": [
-                    {
-                        "name": "[variables('natPoolName')]",
-                        "properties": {
-                            "frontendIPConfiguration": {
-                                "id": "[variables('frontEndIPConfigID')]"
-                            },
-                            "protocol": "tcp",
-                            "frontendPortRangeStart": "[variables('natStartPort')]",
-                            "frontendPortRangeEnd": "[variables('natEndPort')]",
-                            "backendPort": "[variables('natBackendPort')]"
-                        }
-                    }
-                ]
-            },
-            "dependsOn": [
-                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
-            ]
-        },
+          }
+        ],
+        "inboundNatRules": [],
+        "outboundNatRules": [],
+        "inboundNatPools": []
+      },
+      "dependsOn": [
+      ]
+    },
         {
             "type": "Microsoft.Compute/virtualMachineScaleSets",
             "sku": {
@@ -275,9 +214,9 @@
                                         {
                                             "name": "[variables('ipConfigName')]",
                                             "properties": {
-                                                "subnet": {
-                                                    "id": "[concat('/subscriptions/', subscription().subscriptionId,'/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'), '/subnets/', variables('subnetName'))]"
-                                                },
+                                              "subnet": {
+                                                "id": "[concat('/subscriptions/', subscription().subscriptionId,'/resourceGroups/', variables('existingVirtualNetworkResourceGroupName'), '/providers/Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'), '/subnets/', variables('subnetName'))]"
+                                              },
                                                 "loadBalancerBackendAddressPools": [
                                                     {
                                                         "id": "[concat('/subscriptions/', subscription().subscriptionId,'/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('loadBalancerName'), '/backendAddressPools/', variables('bePoolName'))]"
@@ -298,8 +237,7 @@
                 }
             },
             "dependsOn": [
-                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-                "[concat('Microsoft.Network/loadBalancers/', variables('loadBalancerName'))]"
+              "[concat('Microsoft.Network/loadBalancers/', variables('loadBalancerName'))]"
             ]
         }
     ]
